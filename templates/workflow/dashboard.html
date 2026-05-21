@@ -37,12 +37,27 @@
                         <span class="metric-label">ITR Runs</span>
                         <strong>{{ stats.itr_runs }}</strong>
                     </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Corporate Runs</span>
+                        <strong>{{ stats.corporate_runs }}</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Governance Runs</span>
+                        <strong>{{ stats.governance_runs }}</strong>
+                    </article>
                 </div>
                 {% if active_module %}
                     <div class="status-banner">
                         <span>Active module</span>
                         <strong>{{ active_module }}</strong>
                         <small>{{ active_module.assessment_context }}</small>
+                    </div>
+                {% endif %}
+                {% if active_corporate_module %}
+                    <div class="status-banner">
+                        <span>Active corporate module</span>
+                        <strong>{{ active_corporate_module }}</strong>
+                        <small>{{ active_corporate_module.assessment_context }}</small>
                     </div>
                 {% endif %}
             </div>
@@ -755,6 +770,161 @@
                         </article>
                     </div>
                 </section>
+
+                <section class="panel-cluster">
+                    <div class="section-heading compact">
+                        <p class="eyebrow">Second domain path</p>
+                        <h2>Corporate Tax Simulation</h2>
+                    </div>
+
+                    <article class="panel">
+                        <h3>Concept Slice 1</h3>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="evaluate_corporate_concept">
+                            <div class="form-grid four-up">
+                                <label>
+                                    Assessment context
+                                    <input type="text" name="assessment_context" value="{{ sample_payloads.corporate.assessment_context }}">
+                                </label>
+                                <label>
+                                    Registration country
+                                    <input type="text" name="registration_country" value="{{ sample_payloads.corporate.registration_country }}">
+                                </label>
+                                <label>
+                                    Registration act
+                                    <select name="registration_act">
+                                        <option value="COMPANIES_ACT" selected>COMPANIES_ACT</option>
+                                        <option value="LLP_ACT">LLP_ACT</option>
+                                        <option value="OTHER">OTHER</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Regime option
+                                    <select name="regime_option">
+                                        <option value="DEFAULT">DEFAULT</option>
+                                        <option value="OPT_115BAA">OPT_115BAA</option>
+                                        <option value="OPT_115BAB" selected>OPT_115BAB</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Incorporation date
+                                    <input type="date" name="incorporation_date" value="{{ sample_payloads.corporate.incorporation_date }}">
+                                </label>
+                                <label>
+                                    Business activity
+                                    <select name="business_activity">
+                                        <option value="MANUFACTURING" selected>MANUFACTURING</option>
+                                        <option value="SERVICES">SERVICES</option>
+                                        <option value="MIXED">MIXED</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Previous-year turnover
+                                    <input type="number" name="previous_year_turnover" value="{{ sample_payloads.corporate.previous_year_turnover }}">
+                                </label>
+                                <label>
+                                    Construction project days
+                                    <input type="number" name="construction_project_duration_days" value="{{ sample_payloads.corporate.construction_project_duration_days }}">
+                                </label>
+                            </div>
+                            <div class="check-grid">
+                                <label><input type="checkbox" name="management_control_in_india"> Management control in India</label>
+                                <label><input type="checkbox" name="office_fixed_place_in_india"> Fixed place office in India</label>
+                                <label><input type="checkbox" name="agents_dependent_in_india"> Dependent agents in India</label>
+                            </div>
+                            <button type="submit">Run Corporate Concept Evaluation</button>
+                        </form>
+                    </article>
+                </section>
+
+                <section class="panel-cluster">
+                    <div class="section-heading compact">
+                        <p class="eyebrow">Cross-module proof</p>
+                        <h2>Governance Simulation</h2>
+                    </div>
+
+                    <article class="panel">
+                        <h3>ITR + Corporate Linked Review</h3>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="evaluate_governance_cross_module">
+                            <div class="form-grid three-up">
+                                <label>
+                                    ITR context
+                                    <input type="text" name="g_itr_assessment_context" value="{{ sample_payloads.governance.itr_assessment_context }}">
+                                </label>
+                                <label>
+                                    Corporate context
+                                    <input type="text" name="g_corp_assessment_context" value="{{ sample_payloads.governance.corporate_assessment_context }}">
+                                </label>
+                                <label>
+                                    Governance context
+                                    <input type="text" name="g_governance_assessment_context" value="{{ sample_payloads.governance.governance_assessment_context }}">
+                                </label>
+                                <label>
+                                    ITR total income
+                                    <input type="number" name="g_itr_total_income" value="1200000">
+                                </label>
+                                <label>
+                                    Corporate registration country
+                                    <input type="text" name="g_corp_registration_country" value="INDIA">
+                                </label>
+                                <label>
+                                    Corporate registration act
+                                    <select name="g_corp_registration_act">
+                                        <option value="COMPANIES_ACT" selected>COMPANIES_ACT</option>
+                                        <option value="LLP_ACT">LLP_ACT</option>
+                                        <option value="OTHER">OTHER</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Corporate incorporation date
+                                    <input type="date" name="g_corp_incorporation_date" value="2020-01-15">
+                                </label>
+                                <label>
+                                    Corporate business activity
+                                    <select name="g_corp_business_activity">
+                                        <option value="MANUFACTURING" selected>MANUFACTURING</option>
+                                        <option value="SERVICES">SERVICES</option>
+                                        <option value="MIXED">MIXED</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Corporate regime option
+                                    <select name="g_corp_regime_option">
+                                        <option value="DEFAULT">DEFAULT</option>
+                                        <option value="OPT_115BAA">OPT_115BAA</option>
+                                        <option value="OPT_115BAB" selected>OPT_115BAB</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Corporate turnover
+                                    <input type="number" name="g_corp_previous_year_turnover" value="3500000000">
+                                </label>
+                                <label>
+                                    Construction project days
+                                    <input type="number" name="g_corp_construction_project_duration_days" value="0">
+                                </label>
+                                <label>
+                                    ITR residential status
+                                    <select name="g_itr_residential_status">
+                                        <option value="RESIDENT_ORDINARY" selected>RESIDENT_ORDINARY</option>
+                                        <option value="RNOR">RNOR</option>
+                                        <option value="NRI">NRI</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="check-grid">
+                                <label><input type="checkbox" name="g_itr_is_director_in_company" checked> ITR person is company director</label>
+                                <label><input type="checkbox" name="g_itr_has_foreign_assets"> ITR person has foreign assets</label>
+                                <label><input type="checkbox" name="g_corp_management_control_in_india"> Corporate management control in India</label>
+                                <label><input type="checkbox" name="g_corp_office_fixed_place_in_india"> Corporate PE fixed place in India</label>
+                            </div>
+                            <button type="submit">Run Cross-Module Governance Evaluation</button>
+                        </form>
+                    </article>
+                </section>
             </section>
 
             <aside class="side-column">
@@ -812,6 +982,16 @@
                             </span>
                         </div>
                     {% endif %}
+
+                    {% if corporate_module_readiness %}
+                        <div class="readiness-block">
+                            <h4>Corporate module</h4>
+                            <p>{{ corporate_module_readiness.module_version }}</p>
+                            <span class="status-pill {% if corporate_module_readiness.is_ready %}ready{% else %}blocked{% endif %}">
+                                {% if corporate_module_readiness.is_ready %}Ready{% else %}Needs work{% endif %}
+                            </span>
+                        </div>
+                    {% endif %}
                 </article>
 
                 <article class="panel">
@@ -864,6 +1044,22 @@
                         <h4>Tax computation</h4>
                         {% for item in recent_tax_evaluations %}
                             <div class="record-chip">{{ item }} · {{ item.total_liability }}</div>
+                        {% empty %}
+                            <div class="record-chip muted">No runs yet.</div>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Corporate evaluations</h4>
+                        {% for item in recent_corporate_evaluations %}
+                            <div class="record-chip">{{ item }} · {{ item.filing_route }}</div>
+                        {% empty %}
+                            <div class="record-chip muted">No runs yet.</div>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Governance evaluations</h4>
+                        {% for item in recent_governance_evaluations %}
+                            <div class="record-chip">{{ item }} · {{ item.governance_status }}</div>
                         {% empty %}
                             <div class="record-chip muted">No runs yet.</div>
                         {% endfor %}

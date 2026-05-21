@@ -72,6 +72,11 @@ This tracker is based on:
 - [x] 2026-05-21: Added decision-table authoring, detail, supersede, review, and approval flows to the browser studio.
 - [x] 2026-05-21: Added a guided browser promotion flow that rolls rule -> primitive -> decision table -> module -> change set in one path.
 - [x] 2026-05-21: Added `concept_scope.md` to define the prototype boundary, success criteria, and explicitly deferred work.
+- [x] 2026-05-21: Added a concrete “Corporate Concept Slice 1” implementation plan to the master tracker based on `corporate_tax_approach.md`.
+- [x] 2026-05-21: Implemented and seeded the first corporate-tax concept slice with six primitives, two decision tables, one active module, runtime API, audit logging, persistence, and a browser simulation path.
+- [x] 2026-05-21: Implemented and seeded the first governance cross-module slice with active governance module/rules, runtime API, audit logging, persistence, and a browser simulation path that evaluates live ITR and corporate outputs together.
+- [x] 2026-05-21: Added unified governance posture aggregation with severity buckets and per-module signals so cross-module evaluation now returns a consolidated compliance posture.
+- [x] 2026-05-21: Fixed governance UI payload coercion so cross-module browser evaluation uses serializer-typed numeric/date values instead of raw form strings.
 
 ## Phase 1: Project Foundation
 
@@ -179,7 +184,7 @@ This tracker is based on:
 - [x] Feed primitive outputs into decision tables.
 - [ ] Feed outcomes into computation functions.
 - [x] Evaluate consequences based on mode and severity.
-- [ ] Evaluate governance-layer cross-module rules when relevant.
+- [x] Evaluate governance-layer cross-module rules when relevant.
 - [x] Return final outputs plus traceability metadata.
 - [ ] Keep observer/alert evaluations async by default.
 - [x] Keep control-mode rules capable of synchronous blocking.
@@ -207,7 +212,7 @@ This tracker is based on:
 
 ## Phase 11: Corporate Tax Module Implementation
 
-- [ ] Convert `corporate_tax_approach.md` primitives into structured records.
+- [x] Convert `corporate_tax_approach.md` primitives into structured records.
 - [ ] Implement corporate primitive groups:
   - entity classification
   - regime determination
@@ -220,16 +225,77 @@ This tracker is based on:
   - filing form and sequence
   - MAT vs normal tax outcome
 - [ ] Implement computation functions for taxable income, book profit, MAT, surcharge, and final liability.
-- [ ] Encode the corporate module contract with `PROVIDES` and `CONSUMES`.
-- [ ] Activate first usable corporate module version for Tax Year 2026-27.
+- [x] Encode the corporate module contract with `PROVIDES` and `CONSUMES`.
+- [x] Activate first usable corporate module version for Tax Year 2026-27.
+
+### Corporate Concept Slice 1
+
+This is the recommended next implementation slice for the current concept phase.
+
+Goal:
+
+- prove that the same framework can support a second tax domain
+- keep corporate tax separate from ITR as its own module
+- avoid jumping into full MAT/book-profit complexity too early
+
+Scope of Slice 1:
+
+- [x] Implement `CORP.ENTITY_TYPE`
+- [x] Implement `CORP.PE_STATUS`
+- [x] Implement `CORP.TURNOVER_CATEGORY`
+- [x] Implement `CORP.INCORPORATION_DATE_STATUS`
+- [x] Implement `CORP.REGIME_TRACK`
+- [x] Implement `CORP.FILING_ROUTE`
+
+Decision-table focus for Slice 1:
+
+- [x] Build corporate regime-track decision table
+- [x] Build corporate filing-route decision table
+
+Module contract for Slice 1:
+
+- [x] `PROVIDES`:
+  - `entity_type`
+  - `pe_status`
+  - `turnover_category`
+  - `incorporation_date_status`
+  - `regime_track`
+  - `filing_route`
+  - `compliance_alerts`
+- [x] `CONSUMES`:
+  - company profile
+  - registration facts
+  - turnover facts
+  - incorporation facts
+  - optional PE indicators
+
+Runtime target for Slice 1:
+
+- [x] Add one corporate runtime evaluation endpoint
+- [x] Return entity classification, regime track, filing route, and alerts
+- [x] Create audit logs for corporate evaluations
+
+UI target for Slice 1:
+
+- [x] Add a corporate simulation path beside ITR in the browser studio
+- [x] Reuse the same authoring, promotion, review, approval, and activation workflow
+
+Explicitly deferred beyond Slice 1:
+
+- [ ] full taxable-income computation
+- [ ] book-profit computation
+- [ ] MAT vs normal tax computation
+- [ ] surcharge and cess depth
+- [ ] transfer pricing
+- [ ] AMT for LLP and wider entity classes beyond the concept path
 
 ## Phase 12: Governance Layer
 
 - [ ] Implement cross-module rule registration.
 - [ ] Validate cross-module rules against module contracts only.
 - [ ] Add circular dependency detection across modules.
-- [ ] Implement unified compliance status aggregation.
-- [ ] Implement cross-module evaluation triggers.
+- [x] Implement unified compliance status aggregation.
+- [x] Implement cross-module evaluation triggers.
 - [ ] Add governance dashboards for compliance/audit visibility.
 
 ## Phase 13: API and Admin Surface
@@ -269,7 +335,7 @@ This tracker is based on:
 - [x] Milestone 3: One ITR decision flow evaluates successfully from stored rules.
 - [ ] Milestone 4: One corporate tax computation flow evaluates successfully.
 - [ ] Milestone 5: Audit trace reproduces a historical evaluation exactly.
-- [ ] Milestone 6: Cross-module governance rule executes across two modules.
+- [x] Milestone 6: Cross-module governance rule executes across two modules.
 
 ## Suggested Build Order for the First Iteration
 
@@ -289,6 +355,8 @@ This tracker is based on:
 - The seeded AY 2026-27 data now includes two active ITR primitives (`ITR.FORM_ELIGIBILITY`, `ITR.REGIME_SELECTION`) and two active decision tables.
 - The seeded AY 2026-27 data now includes a third active primitive `ITR.TAX_COMPUTATION` for the new-regime computation slice.
 - Current tax computation support is partial: new-regime slab tax, 87A rebate, and cess are implemented; old-regime slab computation, surcharge, and broader income-head computations are still pending.
+- The first governance slice now evaluates live ITR and corporate outputs together through `INDIA_TAX_GOVERNANCE@1.0` and returns review actions from stored cross-module rules.
+- Governance evaluation now also returns a consolidated posture summary with `CLEAR`, `WATCH`, `REVIEW_REQUIRED`, or `CRITICAL_REVIEW`, plus per-module signals that explain the aggregate outcome.
 - Module assembly health is now inspectable via `/api/core-rules/modules/<module_code>/readiness/`.
 - Change-set grouping and activation readiness are now inspectable via `/api/core-rules/change-sets/` and `/api/core-rules/change-sets/<code>/activation-readiness/`.
 - Rule versions can now be superseded through `/api/core-rules/rule-versions/supersede/`, which creates a draft next version with lineage metadata.

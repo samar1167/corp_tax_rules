@@ -11,6 +11,11 @@ from django.shortcuts import redirect, render
 from django.views import View
 
 from audit.services import create_evaluation_log
+from corporate_tax.models import CorporateTaxEvaluation
+from corporate_tax.serializers import CorporateTaxProfileSerializer
+from corporate_tax.services import evaluate_corporate_tax_concept
+from governance.models import GovernanceEvaluation
+from governance.services import evaluate_cross_module_governance
 from itr.models import ITREvaluation, ITRRegimeEvaluation, ITRTaxComputationEvaluation
 from itr.serializers import RegimeSelectionSerializer, TaxComputationSerializer, TaxpayerProfileSerializer
 from itr.services import (
@@ -132,12 +137,24 @@ def _build_dashboard_context(request: HttpRequest) -> dict:
         module__code="INDIA_INDIVIDUAL_TAX",
         status="ACTIVE",
     ).first()
+    active_corporate_module = ModuleVersion.objects.select_related("module", "assessment_context").filter(
+        module__code="INDIA_CORPORATE_TAX",
+        status="ACTIVE",
+    ).first()
     readiness = (
         build_module_readiness_report(
             module_code="INDIA_INDIVIDUAL_TAX",
             assessment_context=active_module.assessment_context.code,
         )
         if active_module
+        else None
+    )
+    corporate_readiness = (
+        build_module_readiness_report(
+            module_code="INDIA_CORPORATE_TAX",
+            assessment_context=active_corporate_module.assessment_context.code,
+        )
+        if active_corporate_module
         else None
     )
 
@@ -161,6 +178,8 @@ def _build_dashboard_context(request: HttpRequest) -> dict:
             "itr_runs": ITREvaluation.objects.count()
             + ITRRegimeEvaluation.objects.count()
             + ITRTaxComputationEvaluation.objects.count(),
+            "corporate_runs": CorporateTaxEvaluation.objects.count(),
+            "governance_runs": GovernanceEvaluation.objects.count(),
         },
         "todo_sections": _load_todo_sections(),
         "latest_result": latest_result,
@@ -224,9 +243,13 @@ def _build_dashboard_context(request: HttpRequest) -> dict:
         "recent_form_evaluations": ITREvaluation.objects.all()[:5],
         "recent_regime_evaluations": ITRRegimeEvaluation.objects.all()[:5],
         "recent_tax_evaluations": ITRTaxComputationEvaluation.objects.all()[:5],
+        "recent_corporate_evaluations": CorporateTaxEvaluation.objects.all()[:5],
+        "recent_governance_evaluations": GovernanceEvaluation.objects.all()[:5],
         "module_readiness": readiness,
+        "corporate_module_readiness": corporate_readiness,
         "latest_activation_readiness": latest_activation_readiness,
         "active_module": active_module,
+        "active_corporate_module": active_corporate_module,
         "sample_payloads": {
             "form": {
                 "assessment_context": "AY_2026_27",
@@ -260,6 +283,21 @@ def _build_dashboard_context(request: HttpRequest) -> dict:
                 "applicable_regime": "NEW_REGIME",
                 "taxable_income": 1500000,
                 "special_rate_income": 0,
+            },
+            "corporate": {
+                "assessment_context": "TY_2026_27",
+                "registration_country": "INDIA",
+                "registration_act": "COMPANIES_ACT",
+                "incorporation_date": "2020-01-15",
+                "business_activity": "MANUFACTURING",
+                "previous_year_turnover": 3500000000,
+                "construction_project_duration_days": 0,
+                "regime_option": "OPT_115BAB",
+            },
+            "governance": {
+                "itr_assessment_context": "AY_2026_27",
+                "corporate_assessment_context": "TY_2026_27",
+                "governance_assessment_context": "GOV_2026_27",
             },
         },
     }
@@ -575,6 +613,8 @@ class WorkflowActionView(View):
             "evaluate_itr_form": self._evaluate_itr_form,
             "evaluate_itr_regime": self._evaluate_itr_regime,
             "evaluate_itr_tax": self._evaluate_itr_tax,
+            "evaluate_corporate_concept": self._evaluate_corporate_concept,
+            "evaluate_governance_cross_module": self._evaluate_governance_cross_module,
         }
 
         handler = handlers.get(action)
@@ -1077,3 +1117,146 @@ class WorkflowActionView(View):
             f"Tax computation completed with liability {result['total_liability']}.",
         )
         _store_latest_result(request, title="ITR Tax Computation", payload=result)
+
+    def _evaluate_corporate_concept(self, request: HttpRequest) -> None:
+        serializer = CorporateTaxProfileSerializer(
+            data={
+                "assessment_context": request.POST.get("assessment_context", "TY_2026_27"),
+                "registration_country": request.POST.get("registration_country"),
+                "registration_act": request.POST.get("registration_act"),
+                "management_control_in_india": _bool_from_post(request, "management_control_in_india"),
+                "office_fixed_place_in_india": _bool_from_post(request, "office_fixed_place_in_india"),
+                "agents_dependent_in_india": _bool_from_post(request, "agents_dependent_in_india"),
+                "construction_project_duration_days": request.POST.get("construction_project_duration_days") or 0,
+                "previous_year_turnover": request.POST.get("previous_year_turnover") or 0,
+                "incorporation_date": request.POST.get("incorporation_date"),
+                "business_activity": request.POST.get("business_activity"),
+                "regime_option": request.POST.get("regime_option", "DEFAULT"),
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        payload = _json_safe(dict(serializer.validated_data))
+        assessment_context = payload.pop("assessment_context", "TY_2026_27")
+        result = evaluate_corporate_tax_concept(payload, assessment_context)
+        CorporateTaxEvaluation.objects.create(
+            profile=payload,
+            entity_type=result["entity_type"],
+            regime_track=result["regime_track"],
+            filing_route=result["filing_route"],
+            decision_trace=result["decision_trace"],
+        )
+        assessment_context_obj = AssessmentContext.objects.get(pk=result["assessment_context_id"])
+        module_version_obj = ModuleVersion.objects.get(pk=result["module_version_id"])
+        audit_log = create_evaluation_log(
+            assessment_context=assessment_context_obj,
+            module_version=module_version_obj,
+            taxpayer_reference=payload,
+            input_payload=payload,
+            primitive_trace=result["primitive_versions"],
+            decision_table_trace=result["decision_table_matches"],
+            outcome_payload={
+                "entity_type": result["entity_type"],
+                "pe_status": result["pe_status"],
+                "turnover_category": result["turnover_category"],
+                "incorporation_date_status": result["incorporation_date_status"],
+                "regime_track": result["regime_track"],
+                "filing_route": result["filing_route"],
+                "compliance_alerts": result["compliance_alerts"],
+            },
+            rule_trace=result["decision_trace"],
+        )
+        result["audit_event_id"] = audit_log.event_id
+        result["audit_entry_hash"] = audit_log.entry_hash
+        messages.success(
+            request,
+            f"Corporate evaluation completed with route {result['filing_route']}.",
+        )
+        _store_latest_result(request, title="Corporate Tax Concept Evaluation", payload=result)
+
+    def _evaluate_governance_cross_module(self, request: HttpRequest) -> None:
+        itr_serializer = TaxpayerProfileSerializer(
+            data={
+                "assessment_context": request.POST.get("g_itr_assessment_context", "AY_2026_27"),
+                "residential_status": request.POST.get("g_itr_residential_status", "RESIDENT_ORDINARY"),
+                "total_income": request.POST.get("g_itr_total_income") or 1200000,
+                "category": "INDIVIDUAL",
+                "is_director_in_company": _bool_from_post(request, "g_itr_is_director_in_company"),
+                "has_unlisted_equity_investment": False,
+                "has_foreign_assets": _bool_from_post(request, "g_itr_has_foreign_assets"),
+                "has_foreign_account_signing_authority": False,
+                "income_sources": ["SALARY"],
+                "has_capital_gains": False,
+                "capital_gain_type": "",
+                "ltcg_112a_amount": 0,
+                "has_carried_forward_capital_loss": False,
+                "house_property_count": 1,
+                "has_brought_forward_house_property_loss": False,
+                "tds_deducted_under_194N": False,
+                "has_esop_tax_deferred": False,
+                "has_business_profession_income": False,
+            }
+        )
+        itr_serializer.is_valid(raise_exception=True)
+        itr_payload = _json_safe(dict(itr_serializer.validated_data))
+        itr_assessment_context = itr_payload.pop("assessment_context", "AY_2026_27")
+
+        corporate_serializer = CorporateTaxProfileSerializer(
+            data={
+                "assessment_context": request.POST.get("g_corp_assessment_context", "TY_2026_27"),
+                "registration_country": request.POST.get("g_corp_registration_country", "INDIA"),
+                "registration_act": request.POST.get("g_corp_registration_act", "COMPANIES_ACT"),
+                "management_control_in_india": _bool_from_post(request, "g_corp_management_control_in_india"),
+                "office_fixed_place_in_india": _bool_from_post(request, "g_corp_office_fixed_place_in_india"),
+                "agents_dependent_in_india": False,
+                "construction_project_duration_days": request.POST.get("g_corp_construction_project_duration_days") or 0,
+                "previous_year_turnover": request.POST.get("g_corp_previous_year_turnover") or 3500000000,
+                "incorporation_date": request.POST.get("g_corp_incorporation_date", "2020-01-15"),
+                "business_activity": request.POST.get("g_corp_business_activity", "MANUFACTURING"),
+                "regime_option": request.POST.get("g_corp_regime_option", "DEFAULT"),
+            }
+        )
+        corporate_serializer.is_valid(raise_exception=True)
+        corporate_payload = _json_safe(dict(corporate_serializer.validated_data))
+        corporate_assessment_context = corporate_payload.pop("assessment_context", "TY_2026_27")
+
+        result = evaluate_cross_module_governance(
+            itr_profile=itr_payload,
+            corporate_profile=corporate_payload,
+            itr_assessment_context=itr_assessment_context,
+            corporate_assessment_context=corporate_assessment_context,
+            governance_assessment_context=request.POST.get("g_governance_assessment_context", "GOV_2026_27"),
+        )
+        record = GovernanceEvaluation.objects.create(
+            assessment_context=AssessmentContext.objects.get(pk=result["assessment_context_id"]),
+            input_payload=result["input_payload"],
+            itr_summary=result["itr_result"],
+            corporate_summary=result["corporate_result"],
+            governance_status=result["governance_status"],
+            governance_actions=result["governance_actions"],
+            governance_summary=result["governance_summary"],
+            rule_trace=result["rule_trace"],
+        )
+        module_version_obj = ModuleVersion.objects.get(pk=result["module_version_id"])
+        audit_log = create_evaluation_log(
+            assessment_context=record.assessment_context,
+            module_version=module_version_obj,
+            taxpayer_reference=result["input_payload"],
+            input_payload=result["input_payload"],
+            primitive_trace=[],
+            decision_table_trace={},
+            outcome_payload={
+                "governance_status": result["governance_status"],
+                "governance_actions": result["governance_actions"],
+                "governance_summary": result["governance_summary"],
+                "depends_on_modules": result["depends_on_modules"],
+            },
+            rule_trace=result["rule_trace"],
+        )
+        result["audit_event_id"] = audit_log.event_id
+        result["audit_entry_hash"] = audit_log.entry_hash
+        result["evaluation_id"] = record.pk
+        messages.success(
+            request,
+            f"Governance evaluation completed with status {result['governance_status']}.",
+        )
+        _store_latest_result(request, title="Cross-Module Governance Evaluation", payload=result)

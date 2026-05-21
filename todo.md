@@ -9,12 +9,14 @@
 - Add activation history and superseded-vs-active lineage views across artifacts.
 - Add artifact diff views so reviewers can see what changed before approval.
 - Add governance-oriented “what changed” summaries across a bundled promotion path.
+- Add governance artifact lifecycle management in the studio so cross-module rules can be created, reviewed, approved, superseded, and activated without seed commands.
+- Harden all remaining workflow simulation forms so every payload path uses serializer-typed values and avoids raw form coercion issues.
 
 ## Runtime Expansion
 - Extend ITR computation beyond the current new-regime slice.
 - Add deduction, filing timeline, verification, and penalty flows to the ITR module.
-- Start the first corporate tax vertical slice with entity classification and rate determination.
-- Add governance-layer cross-module rule execution and consolidated compliance status.
+- Extend the corporate module beyond Slice 1 into taxable-income, MAT, surcharge, and full liability flows.
+- Broaden governance beyond the first narrow cross-module proof into richer compliance aggregation and additional linked-review scenarios.
 - Define a stricter JSON rule schema and decision-table schema before widening authoring volume.
 - Build import-assisted authoring from markdown and structured JSON into draft artifacts.
 - Build a more generic rule and decision interpreter so less runtime behavior stays hand-coded.

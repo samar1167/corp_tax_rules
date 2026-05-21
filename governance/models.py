@@ -1,6 +1,6 @@
 from django.db import models
 
-from core_rules.models import ModuleVersion, StatusChoices, TimestampedModel
+from core_rules.models import AssessmentContext, ModuleVersion, StatusChoices, TimestampedModel
 
 
 class CrossModuleRule(TimestampedModel):
@@ -24,3 +24,24 @@ class CrossModuleRule(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.rule_id}@{self.version}"
+
+
+class GovernanceEvaluation(TimestampedModel):
+    assessment_context = models.ForeignKey(
+        AssessmentContext,
+        on_delete=models.PROTECT,
+        related_name="governance_evaluations",
+    )
+    input_payload = models.JSONField(default=dict)
+    itr_summary = models.JSONField(default=dict)
+    corporate_summary = models.JSONField(default=dict)
+    governance_status = models.CharField(max_length=40)
+    governance_actions = models.JSONField(default=list)
+    governance_summary = models.JSONField(default=dict)
+    rule_trace = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Governance evaluation #{self.pk}"

@@ -95,7 +95,7 @@ These are intentionally parked in `todo.md`:
 - full generic decision interpreter
 - visual decision-table row editor
 - complete reviewer diff/history tooling
-- governance-wide cross-module execution
+- broad governance-wide cross-module execution beyond the first narrow proof
 - production hardening, scaling, and security maturity
 
 ## Current Concept Boundary
