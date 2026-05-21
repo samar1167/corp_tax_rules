@@ -1,0 +1,76 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ artifact }}</title>
+    <link rel="stylesheet" href="{% static 'core_rules/workflow.css' %}">
+</head>
+<body>
+    <div class="page-shell">
+        <p><a class="record-link" href="{% url 'workflow-dashboard' %}">Back to workflow studio</a></p>
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Primitive detail</p>
+                <h1>{{ artifact }}</h1>
+                <p class="hero-text">{{ artifact.primitive.name }} · {{ artifact.status }}</p>
+            </div>
+        </header>
+        {% if messages %}
+            <section class="message-stack">
+                {% for message in messages %}
+                    <div class="message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            </section>
+        {% endif %}
+        <main class="dashboard-grid">
+            <section class="main-column">
+                <article class="panel">
+                    <h3>Attached Rules</h3>
+                    {% for rule in artifact.rules.all %}
+                        <a class="record-link" href="{% url 'rule-version-detail' rule.id %}">{{ rule }}</a>
+                    {% empty %}
+                        <p>No rules linked.</p>
+                    {% endfor %}
+                </article>
+                <article class="panel">
+                    <h3>Schemas</h3>
+                    <div class="form-grid two-up">
+                        <div><h4>Input schema</h4><pre class="result-box">{{ input_schema_pretty }}</pre></div>
+                        <div><h4>Output schema</h4><pre class="result-box">{{ output_schema_pretty }}</pre></div>
+                    </div>
+                </article>
+            </section>
+            <aside class="side-column">
+                {% if artifact.status == "DRAFT" %}
+                    <article class="panel">
+                        <h3>Edit Draft Primitive</h3>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_primitive_draft">
+                            <input type="hidden" name="primitive_version_id" value="{{ artifact.id }}">
+                            <input type="hidden" name="redirect_to" value="{% url 'primitive-version-detail' artifact.id %}">
+                            <label>Version<input type="text" name="version" value="{{ artifact.version }}"></label>
+                            <label>Input schema<textarea name="input_schema" rows="8">{{ input_schema_pretty }}</textarea></label>
+                            <label>Output schema<textarea name="output_schema" rows="8">{{ output_schema_pretty }}</textarea></label>
+                            <label>Rule versions
+                                <select name="rule_version_ids" multiple>
+                                    {% for item in rule_version_options %}
+                                        <option value="{{ item.id }}" {% if item in artifact.rules.all %}selected{% endif %}>{{ item }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <button type="submit">Save Draft Primitive</button>
+                        </form>
+                    </article>
+                {% endif %}
+                <article class="panel">
+                    <h3>Completeness Report</h3>
+                    <pre class="result-box">{{ completeness_pretty }}</pre>
+                </article>
+            </aside>
+        </main>
+    </div>
+</body>
+</html>

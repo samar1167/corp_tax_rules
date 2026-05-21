@@ -1,0 +1,876 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rule Workflow Studio</title>
+    <link rel="stylesheet" href="{% static 'core_rules/workflow.css' %}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Rules-first delivery cockpit</p>
+                <h1>Move tax rules from draft to live evaluation in one place.</h1>
+                <p class="hero-text">
+                    This studio stitches together superseding, bundling, review, approval, activation,
+                    and live ITR evaluation so the implementation path is visible all the way through.
+                </p>
+                <p><a class="record-link" href="{% url 'workflow-promotion' %}">Open guided promotion flow</a></p>
+            </div>
+            <div class="hero-panel">
+                <div class="metric-grid">
+                    <article class="metric-card">
+                        <span class="metric-label">Rule Versions</span>
+                        <strong>{{ stats.rule_versions }}</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Primitive Versions</span>
+                        <strong>{{ stats.primitive_versions }}</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">Change Sets</span>
+                        <strong>{{ stats.change_sets }}</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span class="metric-label">ITR Runs</span>
+                        <strong>{{ stats.itr_runs }}</strong>
+                    </article>
+                </div>
+                {% if active_module %}
+                    <div class="status-banner">
+                        <span>Active module</span>
+                        <strong>{{ active_module }}</strong>
+                        <small>{{ active_module.assessment_context }}</small>
+                    </div>
+                {% endif %}
+            </div>
+        </header>
+
+        {% if messages %}
+            <section class="message-stack">
+                {% for message in messages %}
+                    <div class="message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        <main class="dashboard-grid">
+            <section class="main-column">
+                <div class="section-heading">
+                    <p class="eyebrow">Lifecycle control</p>
+                    <h2>Workflow Workbench</h2>
+                </div>
+
+                <section class="panel-cluster">
+                    <article class="panel">
+                        <h3>Create Drafts</h3>
+                        <div class="form-grid two-up">
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="supersede_rule">
+                                <label>
+                                    Source rule version
+                                    <select name="source_rule_version_id" required>
+                                        {% for item in rule_version_options %}
+                                            {% if item.status == "ACTIVE" or item.status == "APPROVED" %}
+                                                <option value="{{ item.id }}">{{ item }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Supersede Rule</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="supersede_primitive">
+                                <label>
+                                    Source primitive version
+                                    <select name="source_primitive_version_id" required>
+                                        {% for item in primitive_version_options %}
+                                            {% if item.status == "ACTIVE" or item.status == "APPROVED" %}
+                                                <option value="{{ item.id }}">{{ item }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Replacement draft rules
+                                    <select name="replacement_rule_version_ids" multiple>
+                                        {% for item in draft_rules %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Supersede Primitive</button>
+                            </form>
+                        </div>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="supersede_decision_table">
+                            <label>
+                                Source decision table version
+                                <select name="source_decision_table_version_id" required>
+                                    {% for item in decision_table_version_options %}
+                                        {% if item.status == "ACTIVE" or item.status == "APPROVED" %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label>
+                                Replacement input primitives
+                                <select name="replacement_input_primitive_ids" multiple>
+                                    {% for item in primitive_version_options %}
+                                        <option value="{{ item.id }}">{{ item }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <button type="submit">Supersede Decision Table</button>
+                        </form>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="supersede_module">
+                            <label>
+                                Source module version
+                                <select name="source_module_version_id" required>
+                                    {% for item in module_version_options %}
+                                        {% if item.status == "ACTIVE" or item.status == "APPROVED" %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <div class="form-grid two-up">
+                                <label>
+                                    Replacement primitives
+                                    <select name="replacement_primitive_version_ids" multiple>
+                                        {% for item in primitive_version_options %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Replacement decision tables
+                                    <select name="replacement_decision_table_version_ids" multiple>
+                                        {% for item in decision_table_version_options %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                            </div>
+                            <button type="submit">Supersede Module</button>
+                        </form>
+                    </article>
+
+                    <article class="panel">
+                        <h3>Author New Or Cloned Artifacts</h3>
+                        <div class="form-grid two-up">
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="create_rule_draft">
+                                <label>Rule ID<input type="text" name="rule_id" value="ITR.NEW.001" required></label>
+                                <label>Name<input type="text" name="rule_name" value="New Draft Rule" required></label>
+                                <label>Scope
+                                    <select name="scope">
+                                        <option value="ITR">ITR</option>
+                                        <option value="CORPORATE_TAX">CORPORATE_TAX</option>
+                                        <option value="GOVERNANCE">GOVERNANCE</option>
+                                        <option value="SHARED">SHARED</option>
+                                    </select>
+                                </label>
+                                <label>Assessment context
+                                    <select name="assessment_context">{% for context in assessment_contexts %}<option value="{{ context.code }}">{{ context.code }}</option>{% endfor %}</select>
+                                </label>
+                                <label>Version<input type="text" name="version" value="1.0"></label>
+                                <label>Mode
+                                    <select name="mode">
+                                        <option value="CONTROL">CONTROL</option>
+                                        <option value="ALERT">ALERT</option>
+                                        <option value="OBSERVER">OBSERVER</option>
+                                        <option value="DESIGNER">DESIGNER</option>
+                                    </select>
+                                </label>
+                                <label>Severity
+                                    <select name="severity">
+                                        <option value="ABSOLUTE">ABSOLUTE</option>
+                                        <option value="CRITICAL">CRITICAL</option>
+                                        <option value="WARNING">WARNING</option>
+                                        <option value="INFO">INFO</option>
+                                    </select>
+                                </label>
+                                <label>Source reference<input type="text" name="source_reference" value="Draft source"></label>
+                                <label class="span-two">Natural language<textarea name="natural_language" rows="3">Describe the rule in plain language.</textarea></label>
+                                <label class="span-two">Structured logic<textarea name="structured_logic" rows="6">{}</textarea></label>
+                                <label>Trigger JSON<textarea name="trigger" rows="3">{}</textarea></label>
+                                <label>Consequence JSON<textarea name="consequence" rows="3">{}</textarea></label>
+                                <label class="span-two">Definition description<textarea name="rule_description" rows="2"></textarea></label>
+                                <button type="submit">Create Rule Draft</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="clone_rule_to_new_definition">
+                                <label>Source rule version
+                                    <select name="source_rule_version_id">{% for item in rule_version_options %}<option value="{{ item.id }}">{{ item }}</option>{% endfor %}</select>
+                                </label>
+                                <label>New rule ID<input type="text" name="new_rule_id" value="ITR.CLONE.001" required></label>
+                                <label>Name<input type="text" name="rule_name" value="Cloned Rule" required></label>
+                                <label>Scope
+                                    <select name="scope">
+                                        <option value="ITR">ITR</option>
+                                        <option value="CORPORATE_TAX">CORPORATE_TAX</option>
+                                        <option value="GOVERNANCE">GOVERNANCE</option>
+                                        <option value="SHARED">SHARED</option>
+                                    </select>
+                                </label>
+                                <label>Assessment context
+                                    <select name="assessment_context">{% for context in assessment_contexts %}<option value="{{ context.code }}">{{ context.code }}</option>{% endfor %}</select>
+                                </label>
+                                <label>Version<input type="text" name="version" value="1.0"></label>
+                                <label class="span-two">Definition description<textarea name="rule_description" rows="2"></textarea></label>
+                                <button type="submit">Clone Rule To New Definition</button>
+                            </form>
+                        </div>
+
+                        <div class="form-grid two-up top-gap">
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="create_primitive_draft">
+                                <label>Primitive code<input type="text" name="primitive_code" value="ITR.NEW_PRIMITIVE" required></label>
+                                <label>Name<input type="text" name="primitive_name" value="New Primitive" required></label>
+                                <label>Module scope
+                                    <select name="module_scope">
+                                        <option value="ITR">ITR</option>
+                                        <option value="CORPORATE_TAX">CORPORATE_TAX</option>
+                                        <option value="GOVERNANCE">GOVERNANCE</option>
+                                        <option value="SHARED">SHARED</option>
+                                    </select>
+                                </label>
+                                <label>Version<input type="text" name="version" value="1.0"></label>
+                                <label class="span-two">Question<textarea name="question" rows="2">What does this primitive decide?</textarea></label>
+                                <label class="span-two">Description<textarea name="primitive_description" rows="2"></textarea></label>
+                                <label class="span-two">Input schema<textarea name="input_schema" rows="5">{}</textarea></label>
+                                <label class="span-two">Output schema<textarea name="output_schema" rows="5">{}</textarea></label>
+                                <label class="span-two">Rule versions
+                                    <select name="rule_version_ids" multiple>{% for item in rule_version_options %}<option value="{{ item.id }}">{{ item }}</option>{% endfor %}</select>
+                                </label>
+                                <button type="submit">Create Primitive Draft</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="create_module_draft">
+                                <label>Module code<input type="text" name="module_code" value="INDIA_INDIVIDUAL_TAX_NEXT" required></label>
+                                <label>Name<input type="text" name="module_name" value="Next ITR Module" required></label>
+                                <label>Scope
+                                    <select name="scope">
+                                        <option value="ITR">ITR</option>
+                                        <option value="CORPORATE_TAX">CORPORATE_TAX</option>
+                                        <option value="GOVERNANCE">GOVERNANCE</option>
+                                        <option value="SHARED">SHARED</option>
+                                    </select>
+                                </label>
+                                <label>Assessment context
+                                    <select name="assessment_context">{% for context in assessment_contexts %}<option value="{{ context.code }}">{{ context.code }}</option>{% endfor %}</select>
+                                </label>
+                                <label>Version<input type="text" name="version" value="1.0"></label>
+                                <label class="span-two">Description<textarea name="module_description" rows="2"></textarea></label>
+                                <label class="span-two">Primitive versions
+                                    <select name="primitive_version_ids" multiple>{% for item in primitive_version_options %}<option value="{{ item.id }}">{{ item }}</option>{% endfor %}</select>
+                                </label>
+                                <label class="span-two">Decision tables
+                                    <select name="decision_table_version_ids" multiple>{% for item in decision_table_version_options %}<option value="{{ item.id }}">{{ item }}</option>{% endfor %}</select>
+                                </label>
+                                <label class="span-two">Contract provides<textarea name="contract_provides" rows="4">[]</textarea></label>
+                                <label>Contract consumes<textarea name="contract_consumes" rows="4">[]</textarea></label>
+                                <label>Fallback behaviour<textarea name="fallback_behaviour" rows="4">{}</textarea></label>
+                                <button type="submit">Create Module Draft</button>
+                            </form>
+                        </div>
+
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="create_decision_table_draft">
+                            <div class="form-grid three-up">
+                                <label>Decision-table code<input type="text" name="decision_table_code" value="ITR.NEW_TABLE" required></label>
+                                <label>Name<input type="text" name="decision_table_name" value="New Decision Table" required></label>
+                                <label>Scope
+                                    <select name="scope">
+                                        <option value="ITR">ITR</option>
+                                        <option value="CORPORATE_TAX">CORPORATE_TAX</option>
+                                        <option value="GOVERNANCE">GOVERNANCE</option>
+                                        <option value="SHARED">SHARED</option>
+                                    </select>
+                                </label>
+                                <label>Version<input type="text" name="version" value="1.0"></label>
+                                <label class="span-two">Description<textarea name="decision_table_description" rows="2"></textarea></label>
+                                <label class="span-two">Input primitives
+                                    <select name="input_primitive_ids" multiple>{% for item in primitive_version_options %}<option value="{{ item.id }}">{{ item }}</option>{% endfor %}</select>
+                                </label>
+                                <label>Input columns<textarea name="input_columns" rows="5">[]</textarea></label>
+                                <label>Output columns<textarea name="output_columns" rows="5">[]</textarea></label>
+                                <label class="span-two">Rows<textarea name="rows" rows="8">[]</textarea></label>
+                            </div>
+                            <button type="submit">Create Decision Table Draft</button>
+                        </form>
+
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="clone_primitive_to_new_definition">
+                            <div class="form-grid three-up">
+                                <label>Source primitive version
+                                    <select name="source_primitive_version_id">{% for item in primitive_version_options %}<option value="{{ item.id }}">{{ item }}</option>{% endfor %}</select>
+                                </label>
+                                <label>New primitive code<input type="text" name="primitive_code" value="ITR.CLONE_PRIMITIVE" required></label>
+                                <label>Name<input type="text" name="primitive_name" value="Cloned Primitive" required></label>
+                                <label>Module scope
+                                    <select name="module_scope">
+                                        <option value="ITR">ITR</option>
+                                        <option value="CORPORATE_TAX">CORPORATE_TAX</option>
+                                        <option value="GOVERNANCE">GOVERNANCE</option>
+                                        <option value="SHARED">SHARED</option>
+                                    </select>
+                                </label>
+                                <label>Version<input type="text" name="version" value="1.0"></label>
+                                <label>Question<textarea name="question" rows="2">What does this primitive decide?</textarea></label>
+                            </div>
+                            <label>Description<textarea name="primitive_description" rows="2"></textarea></label>
+                            <button type="submit">Clone Primitive To New Definition</button>
+                        </form>
+
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="clone_decision_table_to_new_definition">
+                            <div class="form-grid three-up">
+                                <label>Source decision table version
+                                    <select name="source_decision_table_version_id">{% for item in decision_table_version_options %}<option value="{{ item.id }}">{{ item }}</option>{% endfor %}</select>
+                                </label>
+                                <label>New code<input type="text" name="decision_table_code" value="ITR.CLONE_TABLE" required></label>
+                                <label>Name<input type="text" name="decision_table_name" value="Cloned Decision Table" required></label>
+                                <label>Scope
+                                    <select name="scope">
+                                        <option value="ITR">ITR</option>
+                                        <option value="CORPORATE_TAX">CORPORATE_TAX</option>
+                                        <option value="GOVERNANCE">GOVERNANCE</option>
+                                        <option value="SHARED">SHARED</option>
+                                    </select>
+                                </label>
+                                <label>Version<input type="text" name="version" value="1.0"></label>
+                                <label class="span-two">Description<textarea name="decision_table_description" rows="2"></textarea></label>
+                            </div>
+                            <button type="submit">Clone Decision Table To New Definition</button>
+                        </form>
+                    </article>
+
+                    <article class="panel">
+                        <h3>Bundle Draft Change Set</h3>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="bundle_change_set">
+                            <div class="form-grid three-up">
+                                <label>
+                                    Change-set code
+                                    <input type="text" name="change_set_code" value="CS.ITR.AY2026_27.UI_DRAFT" required>
+                                </label>
+                                <label>
+                                    Name
+                                    <input type="text" name="change_set_name" value="UI Draft Bundle" required>
+                                </label>
+                                <label>
+                                    Assessment context
+                                    <select name="assessment_context" required>
+                                        {% for context in assessment_contexts %}
+                                            <option value="{{ context.code }}">{{ context.code }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                            </div>
+                            <label>
+                                Description
+                                <textarea name="change_set_description" rows="2">Draft bundle created from the workflow studio.</textarea>
+                            </label>
+                            <div class="form-grid four-up">
+                                <label>
+                                    Draft rules
+                                    <select name="rule_version_ids" multiple>
+                                        {% for item in draft_rules %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Draft primitives
+                                    <select name="primitive_version_ids" multiple>
+                                        {% for item in draft_primitives %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Draft decision tables
+                                    <select name="decision_table_version_ids" multiple>
+                                        {% for item in decision_table_version_options %}
+                                            {% if item.status == "DRAFT" %}
+                                                <option value="{{ item.id }}">{{ item }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Draft modules
+                                    <select name="module_version_ids" multiple>
+                                        {% for item in module_version_options %}
+                                            {% if item.status == "DRAFT" %}
+                                                <option value="{{ item.id }}">{{ item }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                            </div>
+                            <button type="submit">Create Or Refresh Draft Bundle</button>
+                        </form>
+                    </article>
+
+                    <article class="panel">
+                        <h3>Review, Approve, Activate</h3>
+                        <div class="form-grid three-up">
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_rule_review">
+                                <label>
+                                    Draft rule
+                                    <select name="rule_version_id" required>
+                                        {% for item in draft_rules %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Submit Rule</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_rule">
+                                <label>
+                                    Under-review rule
+                                    <select name="rule_version_id" required>
+                                        {% for item in under_review_rules %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Approved by
+                                    <input type="text" name="approved_by" value="samar">
+                                </label>
+                                <button type="submit">Approve Rule</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_primitive_review">
+                                <label>
+                                    Draft primitive
+                                    <select name="primitive_version_id" required>
+                                        {% for item in draft_primitives %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Submit Primitive</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_primitive">
+                                <label>
+                                    Under-review primitive
+                                    <select name="primitive_version_id" required>
+                                        {% for item in under_review_primitives %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Approved by
+                                    <input type="text" name="approved_by" value="samar">
+                                </label>
+                                <button type="submit">Approve Primitive</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_decision_table_review">
+                                <label>
+                                    Draft decision table
+                                    <select name="decision_table_version_id" required>
+                                        {% for item in draft_decision_tables %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Submit Decision Table</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_decision_table">
+                                <label>
+                                    Under-review decision table
+                                    <select name="decision_table_version_id" required>
+                                        {% for item in under_review_decision_tables %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Approved by
+                                    <input type="text" name="approved_by" value="samar">
+                                </label>
+                                <button type="submit">Approve Decision Table</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_module_review">
+                                <label>
+                                    Draft module
+                                    <select name="module_version_id" required>
+                                        {% for item in draft_modules %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Submit Module</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_module">
+                                <label>
+                                    Under-review module
+                                    <select name="module_version_id" required>
+                                        {% for item in under_review_modules %}
+                                            <option value="{{ item.id }}">{{ item }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Approved by
+                                    <input type="text" name="approved_by" value="samar">
+                                </label>
+                                <button type="submit">Approve Module</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_change_set_review">
+                                <label>
+                                    Draft change set
+                                    <select name="change_set_code" required>
+                                        {% for item in draft_change_sets %}
+                                            <option value="{{ item.code }}">{{ item.code }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <button type="submit">Submit Change Set</button>
+                            </form>
+
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_change_set">
+                                <label>
+                                    Under-review change set
+                                    <select name="change_set_code" required>
+                                        {% for item in under_review_change_sets %}
+                                            <option value="{{ item.code }}">{{ item.code }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label>
+                                    Approved by
+                                    <input type="text" name="approved_by" value="samar">
+                                </label>
+                                <button type="submit">Approve Change Set</button>
+                            </form>
+                        </div>
+
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide activate-band">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="activate_change_set">
+                            <label>
+                                Approved change set
+                                <select name="change_set_code" required>
+                                    {% for item in approved_change_sets %}
+                                        <option value="{{ item.code }}">{{ item.code }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label>
+                                Activated by
+                                <input type="text" name="activated_by" value="samar">
+                            </label>
+                            <button type="submit">Activate Change Set</button>
+                        </form>
+                    </article>
+                </section>
+
+                <section class="panel-cluster">
+                    <div class="section-heading compact">
+                        <p class="eyebrow">Runtime checks</p>
+                        <h2>Live ITR Simulation</h2>
+                    </div>
+
+                    <article class="panel">
+                        <h3>Form Eligibility</h3>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="evaluate_itr_form">
+                            <div class="form-grid four-up">
+                                <label>
+                                    Assessment context
+                                    <input type="text" name="assessment_context" value="{{ sample_payloads.form.assessment_context }}">
+                                </label>
+                                <label>
+                                    Residential status
+                                    <select name="residential_status">
+                                        <option value="RESIDENT_ORDINARY">RESIDENT_ORDINARY</option>
+                                        <option value="RNOR">RNOR</option>
+                                        <option value="NRI">NRI</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Total income
+                                    <input type="number" name="total_income" value="{{ sample_payloads.form.total_income }}">
+                                </label>
+                                <label>
+                                    Category
+                                    <select name="category">
+                                        <option value="INDIVIDUAL">INDIVIDUAL</option>
+                                        <option value="HUF">HUF</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Capital gain type
+                                    <input type="text" name="capital_gain_type" value="{{ sample_payloads.form.capital_gain_type }}">
+                                </label>
+                                <label>
+                                    LTCG 112A amount
+                                    <input type="number" name="ltcg_112a_amount" value="{{ sample_payloads.form.ltcg_112a_amount }}">
+                                </label>
+                                <label>
+                                    House property count
+                                    <input type="number" name="house_property_count" value="{{ sample_payloads.form.house_property_count }}">
+                                </label>
+                                <label>
+                                    Income sources
+                                    <select name="income_sources" multiple>
+                                        <option value="SALARY" selected>SALARY</option>
+                                        <option value="HOUSE_PROPERTY">HOUSE_PROPERTY</option>
+                                        <option value="CAPITAL_GAINS">CAPITAL_GAINS</option>
+                                        <option value="BUSINESS">BUSINESS</option>
+                                        <option value="PROFESSION">PROFESSION</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="check-grid">
+                                <label><input type="checkbox" name="is_director_in_company"> Director in company</label>
+                                <label><input type="checkbox" name="has_unlisted_equity_investment"> Unlisted equity</label>
+                                <label><input type="checkbox" name="has_foreign_assets"> Foreign assets</label>
+                                <label><input type="checkbox" name="has_foreign_account_signing_authority"> Foreign signing authority</label>
+                                <label><input type="checkbox" name="has_capital_gains"> Has capital gains</label>
+                                <label><input type="checkbox" name="has_carried_forward_capital_loss"> Carried-forward capital loss</label>
+                                <label><input type="checkbox" name="has_brought_forward_house_property_loss"> Brought-forward house property loss</label>
+                                <label><input type="checkbox" name="tds_deducted_under_194N"> TDS under 194N</label>
+                                <label><input type="checkbox" name="has_esop_tax_deferred"> ESOP tax deferred</label>
+                                <label><input type="checkbox" name="has_business_profession_income"> Business/profession income</label>
+                            </div>
+                            <button type="submit">Run Form Eligibility</button>
+                        </form>
+                    </article>
+
+                    <div class="form-grid two-up">
+                        <article class="panel">
+                            <h3>Regime Selection</h3>
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="evaluate_itr_regime">
+                                <label>
+                                    Assessment context
+                                    <input type="text" name="assessment_context" value="{{ sample_payloads.regime.assessment_context }}">
+                                </label>
+                                <label>
+                                    Regime selection
+                                    <select name="regime_selection">
+                                        <option value="NOT_SPECIFIED">NOT_SPECIFIED</option>
+                                        <option value="OLD_REGIME" selected>OLD_REGIME</option>
+                                        <option value="NEW_REGIME">NEW_REGIME</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Filing date
+                                    <input type="date" name="filing_date" value="{{ sample_payloads.regime.filing_date }}">
+                                </label>
+                                <label>
+                                    Due date 139(1)
+                                    <input type="date" name="due_date_139_1" value="{{ sample_payloads.regime.due_date_139_1 }}">
+                                </label>
+                                <label class="checkbox-inline">
+                                    <input type="checkbox" name="has_business_profession_income">
+                                    Has business/profession income
+                                </label>
+                                <button type="submit">Run Regime Selection</button>
+                            </form>
+                        </article>
+
+                        <article class="panel">
+                            <h3>Tax Computation</h3>
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="evaluate_itr_tax">
+                                <label>
+                                    Assessment context
+                                    <input type="text" name="assessment_context" value="{{ sample_payloads.tax.assessment_context }}">
+                                </label>
+                                <label>
+                                    Applicable regime
+                                    <select name="applicable_regime">
+                                        <option value="NEW_REGIME" selected>NEW_REGIME</option>
+                                        <option value="OLD_REGIME">OLD_REGIME</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    Taxable income
+                                    <input type="number" name="taxable_income" value="{{ sample_payloads.tax.taxable_income }}">
+                                </label>
+                                <label>
+                                    Special-rate income
+                                    <input type="number" name="special_rate_income" value="{{ sample_payloads.tax.special_rate_income }}">
+                                </label>
+                                <button type="submit">Run Tax Computation</button>
+                            </form>
+                        </article>
+                    </div>
+                </section>
+            </section>
+
+            <aside class="side-column">
+                <article class="panel">
+                    <h3>Current Todo</h3>
+                    {% for section in todo_sections %}
+                        <div class="todo-block">
+                            <h4>{{ section.title }}</h4>
+                            <ul class="todo-list">
+                                {% for item in section.items %}
+                                    <li>{{ item }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% empty %}
+                        <p>No todo file loaded yet.</p>
+                    {% endfor %}
+                </article>
+
+                <article class="panel">
+                    <h3>Latest Result</h3>
+                    {% if latest_result %}
+                        <p class="result-title">{{ latest_result.title }}</p>
+                        <pre class="result-box">{{ latest_result_pretty }}</pre>
+                    {% else %}
+                        <p>Run an action from the workbench to see the latest payload here.</p>
+                    {% endif %}
+                </article>
+
+                <article class="panel">
+                    <h3>Readiness Snapshot</h3>
+                    {% if module_readiness %}
+                        <div class="badge-row">
+                            <span class="status-pill {% if module_readiness.is_ready %}ready{% else %}blocked{% endif %}">
+                                {% if module_readiness.is_ready %}Ready{% else %}Blocked{% endif %}
+                            </span>
+                            <strong>{{ module_readiness.module_version }}</strong>
+                        </div>
+                        <p>{{ module_readiness.assessment_context }}</p>
+                        <dl class="mini-stats">
+                            <div><dt>Primitives</dt><dd>{{ module_readiness.summary.primitive_count }}</dd></div>
+                            <div><dt>Decision tables</dt><dd>{{ module_readiness.summary.decision_table_count }}</dd></div>
+                            <div><dt>Rules</dt><dd>{{ module_readiness.summary.rule_count }}</dd></div>
+                        </dl>
+                    {% else %}
+                        <p>No active module readiness snapshot available.</p>
+                    {% endif %}
+
+                    {% if latest_activation_readiness %}
+                        <div class="readiness-block">
+                            <h4>Latest approved change set</h4>
+                            <p>{{ latest_activation_readiness.change_set_code }}</p>
+                            <span class="status-pill {% if latest_activation_readiness.is_ready %}ready{% else %}blocked{% endif %}">
+                                {% if latest_activation_readiness.is_ready %}Activation ready{% else %}Needs work{% endif %}
+                            </span>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="panel">
+                    <h3>Browse And Edit</h3>
+                    <div class="recent-group">
+                        <h4>Rule versions</h4>
+                        {% for item in catalog_rule_versions %}
+                            <a class="record-link" href="{% url 'rule-version-detail' item.id %}">{{ item }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Primitive versions</h4>
+                        {% for item in catalog_primitive_versions %}
+                            <a class="record-link" href="{% url 'primitive-version-detail' item.id %}">{{ item }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Decision table versions</h4>
+                        {% for item in catalog_decision_table_versions %}
+                            <a class="record-link" href="{% url 'decision-table-version-detail' item.id %}">{{ item }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Module versions</h4>
+                        {% for item in catalog_module_versions %}
+                            <a class="record-link" href="{% url 'module-version-detail' item.id %}">{{ item }}</a>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                <article class="panel">
+                    <h3>Recent Runs</h3>
+                    <div class="recent-group">
+                        <h4>Form eligibility</h4>
+                        {% for item in recent_form_evaluations %}
+                            <div class="record-chip">{{ item }} · {{ item.selected_form }}</div>
+                        {% empty %}
+                            <div class="record-chip muted">No runs yet.</div>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Regime selection</h4>
+                        {% for item in recent_regime_evaluations %}
+                            <div class="record-chip">{{ item }} · {{ item.applicable_regime }}</div>
+                        {% empty %}
+                            <div class="record-chip muted">No runs yet.</div>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Tax computation</h4>
+                        {% for item in recent_tax_evaluations %}
+                            <div class="record-chip">{{ item }} · {{ item.total_liability }}</div>
+                        {% empty %}
+                            <div class="record-chip muted">No runs yet.</div>
+                        {% endfor %}
+                    </div>
+                </article>
+            </aside>
+        </main>
+    </div>
+</body>
+</html>

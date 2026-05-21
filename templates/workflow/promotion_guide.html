@@ -1,0 +1,371 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Guided Promotion Flow</title>
+    <link rel="stylesheet" href="{% static 'core_rules/workflow.css' %}">
+</head>
+<body>
+    <div class="page-shell">
+        <p><a class="record-link" href="{% url 'workflow-dashboard' %}">Back to workflow studio</a></p>
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Guided promotion</p>
+                <h1>Walk one rule change all the way to activation.</h1>
+                <p class="hero-text">
+                    Choose the artifacts you want to promote, attach each layer to the next one, then
+                    use the same review, approval, and activation gates in sequence.
+                </p>
+            </div>
+        </header>
+
+        {% if messages %}
+            <section class="message-stack">
+                {% for message in messages %}
+                    <div class="message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        <section class="panel-cluster top-gap">
+            <article class="panel">
+                <h3>Choose Promotion Path</h3>
+                <form method="get" action="{% url 'workflow-promotion' %}" class="action-form wide">
+                    <div class="form-grid five-up">
+                        <label>
+                            Rule
+                            <select name="rule">
+                                <option value="">Select</option>
+                                {% for item in rule_version_options %}
+                                    <option value="{{ item.id }}" {% if selection.rule and selection.rule.id == item.id %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            Primitive
+                            <select name="primitive">
+                                <option value="">Select</option>
+                                {% for item in primitive_version_options %}
+                                    <option value="{{ item.id }}" {% if selection.primitive and selection.primitive.id == item.id %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            Decision table
+                            <select name="decision_table">
+                                <option value="">Select</option>
+                                {% for item in decision_table_version_options %}
+                                    <option value="{{ item.id }}" {% if selection.decision_table and selection.decision_table.id == item.id %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            Module
+                            <select name="module">
+                                <option value="">Select</option>
+                                {% for item in module_version_options %}
+                                    <option value="{{ item.id }}" {% if selection.module and selection.module.id == item.id %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            Change set
+                            <select name="change_set">
+                                <option value="">Select</option>
+                                {% for item in change_set_options %}
+                                    <option value="{{ item.code }}" {% if selection.change_set and selection.change_set.code == item.code %}selected{% endif %}>{{ item.code }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </div>
+                    <button type="submit">Load Guided Path</button>
+                </form>
+            </article>
+        </section>
+
+        <main class="panel-cluster top-gap">
+            <article class="panel">
+                <h3>1. Rule Stage</h3>
+                {% if selection.rule %}
+                    <div class="badge-row">
+                        <a class="record-link" href="{% url 'rule-version-detail' selection.rule.id %}">{{ selection.rule }}</a>
+                        <span class="status-pill {% if step_state.rule_ready %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.rule_ready %}Ready{% else %}Needs approval{% endif %}
+                        </span>
+                    </div>
+                    <div class="form-grid two-up top-gap">
+                        {% if selection.rule.status == "DRAFT" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_rule_review">
+                                <input type="hidden" name="rule_version_id" value="{{ selection.rule.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <button type="submit">Submit Rule For Review</button>
+                            </form>
+                        {% endif %}
+                        {% if selection.rule.status == "UNDER_REVIEW" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_rule">
+                                <input type="hidden" name="rule_version_id" value="{{ selection.rule.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <label>Approved by<input type="text" name="approved_by" value="samar"></label>
+                                <button type="submit">Approve Rule</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <p>Select a rule to start the promotion path.</p>
+                {% endif %}
+            </article>
+
+            <article class="panel">
+                <h3>2. Primitive Stage</h3>
+                {% if selection.primitive %}
+                    <div class="badge-row">
+                        <a class="record-link" href="{% url 'primitive-version-detail' selection.primitive.id %}">{{ selection.primitive }}</a>
+                        <span class="status-pill {% if step_state.primitive_contains_rule %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.primitive_contains_rule %}Contains selected rule{% else %}Rule not attached{% endif %}
+                        </span>
+                        <span class="status-pill {% if step_state.primitive_ready %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.primitive_ready %}Ready{% else %}Needs approval{% endif %}
+                        </span>
+                    </div>
+                    {% if selection.rule and selection.primitive.status == "DRAFT" and not step_state.primitive_contains_rule %}
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="guided_attach_rule_to_primitive">
+                            <input type="hidden" name="primitive_version_id" value="{{ selection.primitive.id }}">
+                            <input type="hidden" name="rule_version_id" value="{{ selection.rule.id }}">
+                            <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                            <button type="submit">Attach Rule To Primitive</button>
+                        </form>
+                    {% endif %}
+                    <div class="form-grid two-up top-gap">
+                        {% if selection.primitive.status == "DRAFT" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_primitive_review">
+                                <input type="hidden" name="primitive_version_id" value="{{ selection.primitive.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <button type="submit">Submit Primitive For Review</button>
+                            </form>
+                        {% endif %}
+                        {% if selection.primitive.status == "UNDER_REVIEW" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_primitive">
+                                <input type="hidden" name="primitive_version_id" value="{{ selection.primitive.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <label>Approved by<input type="text" name="approved_by" value="samar"></label>
+                                <button type="submit">Approve Primitive</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <p>Select a primitive to continue the path.</p>
+                {% endif %}
+            </article>
+
+            <article class="panel">
+                <h3>3. Decision Table Stage</h3>
+                {% if selection.decision_table %}
+                    <div class="badge-row">
+                        <a class="record-link" href="{% url 'decision-table-version-detail' selection.decision_table.id %}">{{ selection.decision_table }}</a>
+                        <span class="status-pill {% if step_state.decision_contains_primitive %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.decision_contains_primitive %}Contains selected primitive{% else %}Primitive not attached{% endif %}
+                        </span>
+                        <span class="status-pill {% if step_state.decision_ready %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.decision_ready %}Ready{% else %}Needs approval{% endif %}
+                        </span>
+                    </div>
+                    {% if selection.primitive and selection.decision_table.status == "DRAFT" and not step_state.decision_contains_primitive %}
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="guided_attach_primitive_to_decision_table">
+                            <input type="hidden" name="decision_table_version_id" value="{{ selection.decision_table.id }}">
+                            <input type="hidden" name="primitive_version_id" value="{{ selection.primitive.id }}">
+                            <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                            <button type="submit">Attach Primitive To Decision Table</button>
+                        </form>
+                    {% endif %}
+                    <div class="form-grid two-up top-gap">
+                        {% if selection.decision_table.status == "DRAFT" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_decision_table_review">
+                                <input type="hidden" name="decision_table_version_id" value="{{ selection.decision_table.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <button type="submit">Submit Decision Table For Review</button>
+                            </form>
+                        {% endif %}
+                        {% if selection.decision_table.status == "UNDER_REVIEW" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_decision_table">
+                                <input type="hidden" name="decision_table_version_id" value="{{ selection.decision_table.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <label>Approved by<input type="text" name="approved_by" value="samar"></label>
+                                <button type="submit">Approve Decision Table</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <p>Select a decision table to continue the path.</p>
+                {% endif %}
+            </article>
+
+            <article class="panel">
+                <h3>4. Module Stage</h3>
+                {% if selection.module %}
+                    <div class="badge-row">
+                        <a class="record-link" href="{% url 'module-version-detail' selection.module.id %}">{{ selection.module }}</a>
+                        <span class="status-pill {% if step_state.module_contains_primitive %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.module_contains_primitive %}Contains primitive{% else %}Primitive missing{% endif %}
+                        </span>
+                        <span class="status-pill {% if step_state.module_contains_decision %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.module_contains_decision %}Contains decision table{% else %}Decision table missing{% endif %}
+                        </span>
+                        <span class="status-pill {% if step_state.module_ready %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.module_ready %}Ready{% else %}Needs work{% endif %}
+                        </span>
+                    </div>
+                    {% if selection.module.status == "DRAFT" %}
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="guided_attach_artifacts_to_module">
+                            <input type="hidden" name="module_version_id" value="{{ selection.module.id }}">
+                            <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                            {% if selection.primitive %}<input type="hidden" name="primitive_version_ids" value="{{ selection.primitive.id }}">{% endif %}
+                            {% if selection.decision_table %}<input type="hidden" name="decision_table_version_ids" value="{{ selection.decision_table.id }}">{% endif %}
+                            <button type="submit">Attach Selected Primitive And Decision Table To Module</button>
+                        </form>
+                    {% endif %}
+                    {% if module_readiness %}
+                        <div class="readiness-block">
+                            <h4>Module readiness</h4>
+                            {% if module_readiness.issues %}
+                                <ul class="todo-list">
+                                    {% for issue in module_readiness.issues %}
+                                        <li>{{ issue.code }}: {{ issue.message }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p>Readiness checks are currently passing.</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    <div class="form-grid two-up top-gap">
+                        {% if selection.module.status == "DRAFT" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_module_review">
+                                <input type="hidden" name="module_version_id" value="{{ selection.module.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <button type="submit">Submit Module For Review</button>
+                            </form>
+                        {% endif %}
+                        {% if selection.module.status == "UNDER_REVIEW" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_module">
+                                <input type="hidden" name="module_version_id" value="{{ selection.module.id }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <label>Approved by<input type="text" name="approved_by" value="samar"></label>
+                                <button type="submit">Approve Module</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <p>Select a module to continue the path.</p>
+                {% endif %}
+            </article>
+
+            <article class="panel">
+                <h3>5. Change-Set Stage</h3>
+                {% if selection.change_set %}
+                    <div class="badge-row">
+                        <strong>{{ selection.change_set.code }}</strong>
+                        <span class="status-pill {% if step_state.change_set_contains_module %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.change_set_contains_module %}Contains module{% else %}Module missing{% endif %}
+                        </span>
+                        <span class="status-pill {% if step_state.change_set_ready %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.change_set_ready %}Ready{% else %}Needs work{% endif %}
+                        </span>
+                        <span class="status-pill {% if step_state.change_set_active %}ready{% else %}blocked{% endif %}">
+                            {% if step_state.change_set_active %}Active{% else %}Not active{% endif %}
+                        </span>
+                    </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'workflow-action' %}" class="action-form top-gap">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="guided_bundle_change_set">
+                    <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                    {% if selection.rule %}<input type="hidden" name="rule_version_ids" value="{{ selection.rule.id }}">{% endif %}
+                    {% if selection.primitive %}<input type="hidden" name="primitive_version_ids" value="{{ selection.primitive.id }}">{% endif %}
+                    {% if selection.decision_table %}<input type="hidden" name="decision_table_version_ids" value="{{ selection.decision_table.id }}">{% endif %}
+                    {% if selection.module %}<input type="hidden" name="module_version_ids" value="{{ selection.module.id }}">{% endif %}
+                    <div class="form-grid three-up">
+                        <label>Change-set code<input type="text" name="change_set_code" value="{% if selection.change_set %}{{ selection.change_set.code }}{% else %}CS.ITR.AY2026_27.GUIDED{% endif %}"></label>
+                        <label>Name<input type="text" name="change_set_name" value="Guided Promotion Bundle"></label>
+                        <label>Assessment context
+                            <input type="text" name="assessment_context" value="{% if selection.module %}{{ selection.module.assessment_context.code }}{% else %}AY_2026_27{% endif %}">
+                        </label>
+                    </div>
+                    <label>Description<textarea name="change_set_description" rows="2">Bundle created from guided promotion flow.</textarea></label>
+                    <button type="submit">Bundle Selected Artifacts Into Change Set</button>
+                </form>
+
+                {% if change_set_readiness %}
+                    <div class="readiness-block">
+                        <h4>Activation readiness</h4>
+                        {% if change_set_readiness.issues %}
+                            <ul class="todo-list">
+                                {% for issue in change_set_readiness.issues %}
+                                    <li>{{ issue.code }}: {{ issue.message }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>Activation readiness is currently passing.</p>
+                        {% endif %}
+                    </div>
+                    <div class="form-grid three-up top-gap">
+                        {% if selection.change_set and selection.change_set.status == "DRAFT" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="submit_change_set_review">
+                                <input type="hidden" name="change_set_code" value="{{ selection.change_set.code }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <button type="submit">Submit Change Set For Review</button>
+                            </form>
+                        {% endif %}
+                        {% if selection.change_set and selection.change_set.status == "UNDER_REVIEW" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="approve_change_set">
+                                <input type="hidden" name="change_set_code" value="{{ selection.change_set.code }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <label>Approved by<input type="text" name="approved_by" value="samar"></label>
+                                <button type="submit">Approve Change Set</button>
+                            </form>
+                        {% endif %}
+                        {% if selection.change_set and selection.change_set.status == "APPROVED" %}
+                            <form method="post" action="{% url 'workflow-action' %}" class="action-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="activate_change_set">
+                                <input type="hidden" name="change_set_code" value="{{ selection.change_set.code }}">
+                                <input type="hidden" name="redirect_to" value="{{ selection_redirect }}">
+                                <label>Activated by<input type="text" name="activated_by" value="samar"></label>
+                                <button type="submit">Activate Change Set</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </article>
+        </main>
+    </div>
+</body>
+</html>

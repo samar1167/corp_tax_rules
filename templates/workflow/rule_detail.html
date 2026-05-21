@@ -1,0 +1,83 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ artifact }}</title>
+    <link rel="stylesheet" href="{% static 'core_rules/workflow.css' %}">
+</head>
+<body>
+    <div class="page-shell">
+        <p><a class="record-link" href="{% url 'workflow-dashboard' %}">Back to workflow studio</a></p>
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Rule detail</p>
+                <h1>{{ artifact }}</h1>
+                <p class="hero-text">{{ artifact.rule.name }} · {{ artifact.status }} · {{ artifact.rule.scope }}</p>
+            </div>
+        </header>
+        {% if messages %}
+            <section class="message-stack">
+                {% for message in messages %}
+                    <div class="message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            </section>
+        {% endif %}
+        <main class="dashboard-grid">
+            <section class="main-column">
+                <article class="panel">
+                    <h3>Rule Version Details</h3>
+                    <dl class="mini-stats">
+                        <div><dt>Source reference</dt><dd>{{ artifact.source_reference }}</dd></div>
+                        <div><dt>Mode</dt><dd>{{ artifact.mode }}</dd></div>
+                        <div><dt>Severity</dt><dd>{{ artifact.severity }}</dd></div>
+                        <div><dt>Approved by</dt><dd>{{ artifact.approved_by|default:"-" }}</dd></div>
+                    </dl>
+                    <p>{{ artifact.natural_language }}</p>
+                </article>
+
+                <article class="panel">
+                    <h3>JSON Payloads</h3>
+                    <div class="form-grid three-up">
+                        <div><h4>Structured logic</h4><pre class="result-box">{{ structured_logic_pretty }}</pre></div>
+                        <div><h4>Trigger</h4><pre class="result-box">{{ trigger_pretty }}</pre></div>
+                        <div><h4>Consequence</h4><pre class="result-box">{{ consequence_pretty }}</pre></div>
+                    </div>
+                </article>
+            </section>
+
+            <aside class="side-column">
+                {% if artifact.status == "DRAFT" %}
+                    <article class="panel">
+                        <h3>Edit Draft Rule</h3>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_rule_draft">
+                            <input type="hidden" name="rule_version_id" value="{{ artifact.id }}">
+                            <input type="hidden" name="redirect_to" value="{% url 'rule-version-detail' artifact.id %}">
+                            <label>Assessment context
+                                <select name="assessment_context">{% for context in assessment_contexts %}<option value="{{ context.code }}" {% if artifact.metadata.assessment_context == context.code %}selected{% endif %}>{{ context.code }}</option>{% endfor %}</select>
+                            </label>
+                            <label>Version<input type="text" name="version" value="{{ artifact.version }}"></label>
+                            <label>Source reference<input type="text" name="source_reference" value="{{ artifact.source_reference }}"></label>
+                            <label>Mode<input type="text" name="mode" value="{{ artifact.mode }}"></label>
+                            <label>Severity<input type="text" name="severity" value="{{ artifact.severity }}"></label>
+                            <label>Natural language<textarea name="natural_language" rows="4">{{ artifact.natural_language }}</textarea></label>
+                            <label>Structured logic<textarea name="structured_logic" rows="10">{{ structured_logic_pretty }}</textarea></label>
+                            <label>Trigger<textarea name="trigger" rows="6">{{ trigger_pretty }}</textarea></label>
+                            <label>Consequence<textarea name="consequence" rows="6">{{ consequence_pretty }}</textarea></label>
+                            <button type="submit">Save Draft Rule</button>
+                        </form>
+                    </article>
+                {% endif %}
+
+                <article class="panel">
+                    <h3>Metadata</h3>
+                    <pre class="result-box">{{ metadata_pretty }}</pre>
+                </article>
+            </aside>
+        </main>
+    </div>
+</body>
+</html>

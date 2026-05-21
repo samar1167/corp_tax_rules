@@ -1,0 +1,104 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ artifact }}</title>
+    <link rel="stylesheet" href="{% static 'core_rules/workflow.css' %}">
+</head>
+<body>
+    <div class="page-shell">
+        <p><a class="record-link" href="{% url 'workflow-dashboard' %}">Back to workflow studio</a></p>
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Module detail</p>
+                <h1>{{ artifact }}</h1>
+                <p class="hero-text">{{ artifact.module.name }} · {{ artifact.status }} · {{ artifact.assessment_context }}</p>
+            </div>
+        </header>
+        {% if messages %}
+            <section class="message-stack">
+                {% for message in messages %}
+                    <div class="message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            </section>
+        {% endif %}
+        <main class="dashboard-grid">
+            <section class="main-column">
+                <article class="panel">
+                    <h3>Readiness</h3>
+                    <div class="badge-row">
+                        <span class="status-pill {% if readiness.is_ready %}ready{% else %}blocked{% endif %}">
+                            {% if readiness.is_ready %}Ready{% else %}Blocked{% endif %}
+                        </span>
+                        <strong>{{ readiness.module_version }}</strong>
+                    </div>
+                    <dl class="mini-stats">
+                        <div><dt>Primitives</dt><dd>{{ readiness.summary.primitive_count }}</dd></div>
+                        <div><dt>Decision tables</dt><dd>{{ readiness.summary.decision_table_count }}</dd></div>
+                        <div><dt>Rules</dt><dd>{{ readiness.summary.rule_count }}</dd></div>
+                    </dl>
+                    {% if readiness.issues %}
+                        <ul class="todo-list">
+                            {% for issue in readiness.issues %}
+                                <li>{{ issue.code }}: {{ issue.message }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </article>
+                <article class="panel">
+                    <h3>Attached Artifacts</h3>
+                    <div class="recent-group">
+                        <h4>Primitives</h4>
+                        {% for item in artifact.primitives.all %}
+                            <a class="record-link" href="{% url 'primitive-version-detail' item.id %}">{{ item }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="recent-group">
+                        <h4>Decision tables</h4>
+                        {% for item in artifact.decision_tables.all %}
+                            <a class="record-link" href="{% url 'decision-table-version-detail' item.id %}">{{ item }}</a>
+                        {% endfor %}
+                    </div>
+                </article>
+            </section>
+            <aside class="side-column">
+                {% if artifact.status == "DRAFT" %}
+                    <article class="panel">
+                        <h3>Edit Draft Module</h3>
+                        <form method="post" action="{% url 'workflow-action' %}" class="action-form wide">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_module_draft">
+                            <input type="hidden" name="module_version_id" value="{{ artifact.id }}">
+                            <input type="hidden" name="redirect_to" value="{% url 'module-version-detail' artifact.id %}">
+                            <label>Version<input type="text" name="version" value="{{ artifact.version }}"></label>
+                            <label>Assessment context
+                                <select name="assessment_context">{% for context in assessment_contexts %}<option value="{{ context.code }}" {% if artifact.assessment_context.code == context.code %}selected{% endif %}>{{ context.code }}</option>{% endfor %}</select>
+                            </label>
+                            <label>Primitive versions
+                                <select name="primitive_version_ids" multiple>
+                                    {% for item in primitive_version_options %}
+                                        <option value="{{ item.id }}" {% if item in artifact.primitives.all %}selected{% endif %}>{{ item }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label>Decision table versions
+                                <select name="decision_table_version_ids" multiple>
+                                    {% for item in decision_table_version_options %}
+                                        <option value="{{ item.id }}" {% if item in artifact.decision_tables.all %}selected{% endif %}>{{ item }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label>Contract provides<textarea name="contract_provides" rows="6">{{ contract_provides_pretty }}</textarea></label>
+                            <label>Contract consumes<textarea name="contract_consumes" rows="6">{{ contract_consumes_pretty }}</textarea></label>
+                            <label>Fallback behaviour<textarea name="fallback_behaviour" rows="6">{{ fallback_pretty }}</textarea></label>
+                            <button type="submit">Save Draft Module</button>
+                        </form>
+                    </article>
+                {% endif %}
+            </aside>
+        </main>
+    </div>
+</body>
+</html>
